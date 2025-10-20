@@ -60,6 +60,45 @@ app.get('/test', async (req, res) => {
   }
 });
 
+// Juice Bar API endpoints
+app.post('/juiceBar/placeOrder', (req, res) => {
+  try {
+    const orderData = req.body;
+    const timestamp = new Date().toISOString();
+    
+    console.log(`[${timestamp}] Juice Bar Place Order:`, JSON.stringify(orderData, null, 2));
+    
+    res.json({ 
+      status: 'success', 
+      message: 'Order placed successfully',
+      timestamp: timestamp,
+      order: orderData || 'N/A'
+    });
+  } catch (error) {
+    console.error('Error processing place order:', error);
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+app.post('/juiceBar/orderComplete', (req, res) => {
+  try {
+    const orderData = req.body;
+    const timestamp = new Date().toISOString();
+    
+    console.log(`[${timestamp}] Juice Bar Order Complete:`, JSON.stringify(orderData, null, 2));
+    
+    res.json({ 
+      status: 'success', 
+      message: 'Order completion recorded successfully',
+      timestamp: timestamp,
+      order: orderData || 'N/A'
+    });
+  } catch (error) {
+    console.error('Error processing order completion:', error);
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
 // Start server
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
