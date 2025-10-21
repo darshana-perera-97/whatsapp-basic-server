@@ -16,7 +16,8 @@ coverage/
 
 
 # data
-.wwebjs_auth
+.wwebjs_auth/
+.wwebjs_cache/
 
 # nyc test coverage
 .nyc_output

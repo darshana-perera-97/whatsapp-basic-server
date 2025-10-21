@@ -1,0 +1,27 @@
+{
+  "contactNumber": "771461925",
+  "orderId": "148152",
+  "orderDate": "2025-10-20T21:39:34.727557",
+  "totalPrice": 240,
+  "paymentStatus": "unpaid",
+  "paymentAmount": 240,
+  "shopName": "da Juice Bar",
+  "items": [
+    {
+      "id": "1760972973124",
+      "name": "Fresh Orange Juice",
+      "description": "Freshly squeezed orange juice",
+      "price": 100,
+      "category": "Fresh Juices",
+      "quantity": 1
+    },
+    {
+      "id": "1760974336164",
+      "name": "Mango Smoothie",
+      "description": "Creamy mango smoothie",
+      "price": 140,
+      "category": "Smoothies",
+      "quantity": 1
+    }
+  ]
+}
