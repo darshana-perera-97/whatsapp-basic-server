@@ -195,7 +195,7 @@ app.post('/juiceBar/orderComplete', async (req, res) => {
         });
         
         // Create completion message based on requirements
-        let completionMessage = `Order from *${orderData.shopName}* on ${formattedDate} & ${formattedTime} is ready now.\n\n`;
+        let completionMessage = `Order from *${orderData.shopName}* on ${formattedDate} is ready now.\n\n`;
         completionMessage += `Come to shop and collect the order.\n\n`;
         
         // Add payment status message
