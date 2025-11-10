@@ -260,6 +260,90 @@ app.post('/sendWhatsAppMessage', async (req, res) => {
   }
 });
 
+// Helper function to format contact form message
+function formatContactFormMessage(formData) {
+  const { timestamp, name, email, phone, country, subject, travel_start, travel_end, travelers } = formData;
+  
+  // Format date from timestamp
+  let formattedDate = timestamp || new Date().toISOString();
+  if (timestamp) {
+    try {
+      const date = new Date(timestamp);
+      formattedDate = date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+    } catch (e) {
+      formattedDate = timestamp;
+    }
+  }
+  
+  let message = `*📋 New Tour Inquiry*\n\n`;
+  message += `📅 *Date:* ${formattedDate}\n`;
+  message += `👤 *Name:* ${name || 'N/A'}\n`;
+  message += `📧 *Email:* ${email || 'N/A'}\n`;
+  message += `📱 *Phone:* ${phone || 'N/A'}\n`;
+  message += `🌍 *Country:* ${country || 'N/A'}\n`;
+  message += `📌 *Subject:* ${subject || 'N/A'}\n`;
+  message += `✈️ *Travel Start:* ${travel_start || 'N/A'}\n`;
+  message += `✈️ *Travel End:* ${travel_end || 'N/A'}\n`;
+  message += `👥 *Travelers:* ${travelers || 'N/A'}\n`;
+  
+  return message;
+}
+
+// DM Tours contact form endpoint
+app.post('/dm-tors/contactform', async (req, res) => {
+  try {
+    const formData = req.body;
+    const timestamp = new Date().toISOString();
+    
+    console.log(`[${timestamp}] DM Tours Contact Form:`, JSON.stringify(formData, null, 2));
+    
+    // Format and send WhatsApp message
+    try {
+      const recipientNumber = '94771461925'; // WhatsApp number without +
+      const chatId = recipientNumber + '@c.us';
+      const message = formatContactFormMessage(formData);
+      
+      console.log(`Attempting to send WhatsApp message to: ${recipientNumber}`);
+      console.log(`Chat ID: ${chatId}`);
+      console.log(`Message content: ${message}`);
+      console.log(`Client ready state: ${client.info ? 'Ready' : 'Not ready'}`);
+      
+      await client.sendMessage(chatId, message);
+      console.log(`✅ WhatsApp message sent successfully to ${recipientNumber}`);
+      
+      res.json({ 
+        status: 'success', 
+        message: 'Contact form submitted and WhatsApp message sent successfully',
+        timestamp: timestamp,
+        sentTo: recipientNumber,
+        data: formData
+      });
+    } catch (whatsappError) {
+      console.error('❌ Error sending WhatsApp message:', whatsappError);
+      console.error('Error details:', whatsappError.message);
+      
+      // Still return success for the API call, but note WhatsApp failure
+      res.json({ 
+        status: 'partial_success', 
+        message: 'Contact form submitted but WhatsApp message failed to send',
+        timestamp: timestamp,
+        whatsappError: whatsappError.message,
+        data: formData
+      });
+    }
+  } catch (error) {
+    console.error('Error processing contact form:', error);
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
 // Start server
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
