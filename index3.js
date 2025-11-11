@@ -16,11 +16,45 @@ if (!RECAPTCHA_SECRET_KEY) {
 }
 
 // CORS configuration
+const allowedOrigins = process.env.CORS_ORIGIN 
+  ? process.env.CORS_ORIGIN.split(',').map(origin => origin.trim())
+  : ['https://dmtours.lk', 'https://www.dmtours.lk', 'http://localhost:3000', 'http://localhost:5173'];
+
 const corsOptions = {
-  origin: process.env.CORS_ORIGIN || '*', // Allow all origins by default, or set specific origin(s) via CORS_ORIGIN env var
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) {
+      console.log('CORS: Request with no origin - allowing');
+      return callback(null, true);
+    }
+    
+    console.log(`CORS: Checking origin: ${origin}`);
+    console.log(`CORS: Allowed origins: ${allowedOrigins.join(', ')}`);
+    
+    // Check if origin is in allowed list
+    if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+      console.log(`CORS: Origin ${origin} is allowed`);
+      callback(null, true);
+    } else {
+      // Also check without trailing slash
+      const originWithoutSlash = origin.replace(/\/$/, '');
+      const matched = allowedOrigins.some(allowed => {
+        const allowedWithoutSlash = allowed.replace(/\/$/, '');
+        return allowedWithoutSlash === originWithoutSlash;
+      });
+      
+      if (matched) {
+        console.log(`CORS: Origin ${origin} is allowed (matched without trailing slash)`);
+        callback(null, true);
+      } else {
+        console.error(`CORS: Origin ${origin} is NOT allowed`);
+        callback(new Error(`Not allowed by CORS: ${origin}`));
+      }
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
-  credentials: false,
+  credentials: true,
   preflightContinue: false,
   optionsSuccessStatus: 204
 };
