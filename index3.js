@@ -15,7 +15,21 @@ if (!RECAPTCHA_SECRET_KEY) {
   console.warn('⚠️  WARNING: RECAPTCHA_SECRET_KEY is not set in environment variables');
 }
 
-app.use(cors());
+// CORS configuration
+const corsOptions = {
+  origin: process.env.CORS_ORIGIN || '*', // Allow all origins by default, or set specific origin(s) via CORS_ORIGIN env var
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  credentials: false,
+  preflightContinue: false,
+  optionsSuccessStatus: 204
+};
+
+app.use(cors(corsOptions));
+
+// Handle preflight requests explicitly
+app.options('*', cors(corsOptions));
+
 app.use(express.json());
 
 // Initialize WhatsApp client with session persistence
