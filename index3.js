@@ -1,10 +1,12 @@
 const express = require('express');
+const cors = require('cors');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 
 const app = express();
 const PORT = process.env.PORT || 3056;
 
+app.use(cors());
 app.use(express.json());
 
 // Initialize WhatsApp client with session persistence
