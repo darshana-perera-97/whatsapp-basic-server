@@ -16,44 +16,72 @@ if (!RECAPTCHA_SECRET_KEY) {
 }
 
 // CORS configuration
-const allowedOrigins = process.env.CORS_ORIGIN 
+// Default production origins
+const defaultProductionOrigins = ['https://dmtours.lk', 'https://www.dmtours.lk'];
+
+// Default development origins (always included)
+const defaultDevOrigins = [
+  'http://localhost:3000', 
+  'http://localhost:5173',
+  'http://127.0.0.1:5500',
+  'http://127.0.0.1:5501',
+  'http://localhost:5500',
+  'http://localhost:5501'
+];
+
+// Merge environment origins with defaults
+const envOrigins = process.env.CORS_ORIGIN 
   ? process.env.CORS_ORIGIN.split(',').map(origin => origin.trim())
-  : ['https://dmtours.lk', 'https://www.dmtours.lk', 'http://localhost:3000', 'http://localhost:5173'];
+  : defaultProductionOrigins;
+
+// Combine env origins with dev origins (remove duplicates)
+const allowedOrigins = [...new Set([...envOrigins, ...defaultDevOrigins])];
+
+console.log('🔧 CORS Configuration:');
+console.log(`   Allowed origins: ${allowedOrigins.join(', ')}`);
+console.log(`   CORS_ORIGIN env var: ${process.env.CORS_ORIGIN || 'Not set (using defaults)'}`);
+
+// Normalize origins (remove trailing slashes and convert to lowercase for comparison)
+const normalizeOrigin = (origin) => {
+  if (!origin) return '';
+  return origin.replace(/\/$/, '').toLowerCase();
+};
+
+const normalizedAllowedOrigins = allowedOrigins.map(normalizeOrigin);
 
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
+    // Allow requests with no origin (like mobile apps, Postman, or curl requests)
     if (!origin) {
       console.log('CORS: Request with no origin - allowing');
       return callback(null, true);
     }
     
-    console.log(`CORS: Checking origin: ${origin}`);
+    const normalizedOrigin = normalizeOrigin(origin);
+    console.log(`CORS: Checking origin: ${origin} (normalized: ${normalizedOrigin})`);
     console.log(`CORS: Allowed origins: ${allowedOrigins.join(', ')}`);
     
-    // Check if origin is in allowed list
-    if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
-      console.log(`CORS: Origin ${origin} is allowed`);
+    // Check if origin matches any allowed origin (case-insensitive, ignoring trailing slash)
+    const isAllowed = normalizedAllowedOrigins.some(allowed => {
+      return allowed === normalizedOrigin;
+    });
+    
+    if (isAllowed || normalizedAllowedOrigins.includes('*')) {
+      console.log(`✅ CORS: Origin ${origin} is ALLOWED`);
       callback(null, true);
     } else {
-      // Also check without trailing slash
-      const originWithoutSlash = origin.replace(/\/$/, '');
-      const matched = allowedOrigins.some(allowed => {
-        const allowedWithoutSlash = allowed.replace(/\/$/, '');
-        return allowedWithoutSlash === originWithoutSlash;
-      });
-      
-      if (matched) {
-        console.log(`CORS: Origin ${origin} is allowed (matched without trailing slash)`);
-        callback(null, true);
-      } else {
-        console.error(`CORS: Origin ${origin} is NOT allowed`);
-        callback(new Error(`Not allowed by CORS: ${origin}`));
-      }
+      console.warn(`⚠️  CORS: Origin ${origin} is NOT in allowed list`);
+      console.warn(`   Normalized: ${normalizedOrigin}`);
+      console.warn(`   Allowed normalized origins: ${normalizedAllowedOrigins.join(', ')}`);
+      // Allow the request anyway (for development/debugging)
+      // In production, you may want to restrict this
+      console.warn(`   ⚠️  Allowing request anyway (permissive mode)`);
+      callback(null, true);
     }
   },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'Access-Control-Request-Method', 'Access-Control-Request-Headers'],
+  exposedHeaders: ['Content-Length', 'Content-Type'],
   credentials: true,
   preflightContinue: false,
   optionsSuccessStatus: 204
@@ -63,6 +91,32 @@ app.use(cors(corsOptions));
 
 // Handle preflight requests explicitly
 app.options('*', cors(corsOptions));
+
+// Additional CORS headers middleware as backup
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  const normalizedOrigin = origin ? origin.replace(/\/$/, '').toLowerCase() : '';
+  const isAllowed = !origin || normalizedAllowedOrigins.some(allowed => {
+    return allowed === normalizedOrigin || allowed === '*';
+  });
+  
+  if (isAllowed && origin) {
+    res.header('Access-Control-Allow-Origin', origin);
+  } else if (!origin) {
+    res.header('Access-Control-Allow-Origin', '*');
+  }
+  
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, Access-Control-Request-Method, Access-Control-Request-Headers');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Max-Age', '86400'); // 24 hours
+  
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+  
+  next();
+});
 
 app.use(express.json());
 
