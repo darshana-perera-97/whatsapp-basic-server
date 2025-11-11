@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const { Client, LocalAuth } = require('whatsapp-web.js');
@@ -5,6 +7,13 @@ const qrcode = require('qrcode-terminal');
 
 const app = express();
 const PORT = process.env.PORT || 3056;
+
+// reCAPTCHA secret key from environment variables
+const RECAPTCHA_SECRET_KEY = process.env.RECAPTCHA_SECRET_KEY;
+
+if (!RECAPTCHA_SECRET_KEY) {
+  console.warn('⚠️  WARNING: RECAPTCHA_SECRET_KEY is not set in environment variables');
+}
 
 app.use(cors());
 app.use(express.json());
@@ -89,7 +98,7 @@ app.get('/test', async (req, res) => {
 function formatSriLankanNumber(contactNumber) {
   // Remove any spaces, dashes, or other characters including +
   let cleanNumber = contactNumber.replace(/[\s\-\(\)\+]/g, '');
-  
+
   // If number starts with 0, replace with 94
   if (cleanNumber.startsWith('0')) {
     cleanNumber = '94' + cleanNumber.substring(1);
@@ -98,34 +107,34 @@ function formatSriLankanNumber(contactNumber) {
   else if (!cleanNumber.startsWith('94')) {
     cleanNumber = '94' + cleanNumber;
   }
-  
+
   return cleanNumber;
 }
 
 // Helper function to format order message
 function formatOrderMessage(orderData) {
   const { shopName, items, totalPrice, orderId } = orderData;
-  
+
   let message = `*${shopName}*\n\n`;
   message += `📋 *Order Details*\n`;
   message += `Order ID: ${orderId}\n\n`;
-  
+
   message += `🛒 *Items Ordered:*\n`;
   message += `┌─────────────────────────────────┐\n`;
-  
+
   items.forEach((item, index) => {
     const itemNumber = String(index + 1).padStart(2, '0');
     const itemName = item.name.length > 15 ? item.name.substring(0, 15) + '...' : item.name;
     const quantity = `x${item.quantity}`;
     const price = `Rs.${item.price}`;
-    
+
     message += `│ Item-${itemNumber} │ ${itemName.padEnd(18)} │ ${quantity.padEnd(3)} │ ${price.padEnd(8)} │\n`;
   });
-  
+
   message += `└─────────────────────────────────┘\n\n`;
   message += `💰 *Total Amount: Rs.${totalPrice}*\n\n`;
   message += `Thank you for your order! 🙏 Will inform you through whatsapp when order is ready.`;
-  
+
   return message;
 }
 
@@ -134,21 +143,21 @@ app.post('/juiceBar/placeOrder', async (req, res) => {
   try {
     const orderData = req.body;
     const timestamp = new Date().toISOString();
-    
+
     console.log(`[${timestamp}] Juice Bar Place Order:`, JSON.stringify(orderData, null, 2));
-    
+
     // Send WhatsApp message if contact number is provided
     if (orderData.contactNumber) {
       try {
         const formattedNumber = formatSriLankanNumber(orderData.contactNumber);
         const chatId = formattedNumber + '@c.us';
         const message = formatOrderMessage(orderData);
-        
+
         console.log(`Attempting to send WhatsApp message to: ${formattedNumber}`);
         console.log(`Chat ID: ${chatId}`);
         console.log(`Message content: ${message}`);
         console.log(`Client ready state: ${client.info ? 'Ready' : 'Not ready'}`);
-        
+
         await client.sendMessage(chatId, message);
         console.log(`✅ WhatsApp message sent successfully to ${formattedNumber}`);
       } catch (whatsappError) {
@@ -157,9 +166,9 @@ app.post('/juiceBar/placeOrder', async (req, res) => {
         // Don't fail the order if WhatsApp fails
       }
     }
-    
-    res.json({ 
-      status: 'success', 
+
+    res.json({
+      status: 'success',
       message: 'Order placed successfully',
       timestamp: timestamp,
       order: orderData || 'N/A'
@@ -174,15 +183,15 @@ app.post('/juiceBar/orderComplete', async (req, res) => {
   try {
     const orderData = req.body;
     const timestamp = new Date().toISOString();
-    
+
     console.log(`[${timestamp}] Juice Bar Order Complete:`, JSON.stringify(orderData, null, 2));
-    
+
     // Send WhatsApp message if contact number is provided
     if (orderData.contactNumber) {
       try {
         const formattedNumber = formatSriLankanNumber(orderData.contactNumber);
         const chatId = formattedNumber + '@c.us';
-        
+
         // Format date and time
         const orderDate = new Date(orderData.orderDate || timestamp);
         const formattedDate = orderDate.toLocaleDateString('en-US', {
@@ -195,18 +204,18 @@ app.post('/juiceBar/orderComplete', async (req, res) => {
           minute: '2-digit',
           hour12: true
         });
-        
+
         // Create completion message based on requirements
         let completionMessage = `Order from *${orderData.shopName}* on ${formattedDate} is ready now.\n\n`;
         completionMessage += `Come to shop and collect the order.\n\n`;
-        
+
         // Add payment status message
         if (orderData.paymentStatus === 'unpaid') {
           completionMessage += `💰 Please pay the bill Rs.${orderData.paymentAmount} when collecting your order.`;
         } else {
           completionMessage += `✅ Payment has been completed.`;
         }
-        
+
         await client.sendMessage(chatId, completionMessage);
         console.log(`WhatsApp completion message sent to ${formattedNumber}`);
       } catch (whatsappError) {
@@ -214,9 +223,9 @@ app.post('/juiceBar/orderComplete', async (req, res) => {
         // Don't fail the order completion if WhatsApp fails
       }
     }
-    
-    res.json({ 
-      status: 'success', 
+
+    res.json({
+      status: 'success',
       message: 'Order completion recorded successfully',
       timestamp: timestamp,
       order: orderData || 'N/A'
@@ -231,31 +240,31 @@ app.post('/juiceBar/orderComplete', async (req, res) => {
 app.post('/sendWhatsAppMessage', async (req, res) => {
   try {
     const { contactNumber, message, shopName } = req.body;
-    
+
     if (!contactNumber || !message) {
-      return res.status(400).json({ 
-        status: 'error', 
-        message: 'contactNumber and message are required' 
+      return res.status(400).json({
+        status: 'error',
+        message: 'contactNumber and message are required'
       });
     }
-    
+
     const formattedNumber = formatSriLankanNumber(contactNumber);
     const chatId = formattedNumber + '@c.us';
-    
+
     // Format message with shop name if provided
     let formattedMessage = message;
     if (shopName) {
       formattedMessage = `*${shopName}*\n\n${message}`;
     }
-    
+
     await client.sendMessage(chatId, formattedMessage);
-    
-    res.json({ 
-      status: 'success', 
+
+    res.json({
+      status: 'success',
       message: 'WhatsApp message sent successfully',
       sentTo: formattedNumber
     });
-    
+
   } catch (error) {
     console.error('Error sending WhatsApp message:', error);
     res.status(500).json({ status: 'error', message: error.message });
@@ -265,7 +274,7 @@ app.post('/sendWhatsAppMessage', async (req, res) => {
 // Helper function to format contact form message
 function formatContactFormMessage(formData) {
   const { timestamp, name, email, phone, country, subject, travel_start, travel_end, travelers } = formData;
-  
+
   // Format date from timestamp
   let formattedDate = timestamp || new Date().toISOString();
   if (timestamp) {
@@ -283,7 +292,7 @@ function formatContactFormMessage(formData) {
       formattedDate = timestamp;
     }
   }
-  
+
   let message = `*📋 New Tour Inquiry*\n\n`;
   message += `📅 *Date:* ${formattedDate}\n`;
   message += `👤 *Name:* ${name || 'N/A'}\n`;
@@ -294,34 +303,74 @@ function formatContactFormMessage(formData) {
   message += `✈️ *Travel Start:* ${travel_start || 'N/A'}\n`;
   message += `✈️ *Travel End:* ${travel_end || 'N/A'}\n`;
   message += `👥 *Travelers:* ${travelers || 'N/A'}\n`;
-  
+
   return message;
 }
 
 // DM Tours contact form endpoint
 app.post('/dm-tors/contactform', async (req, res) => {
   try {
-    const formData = req.body;
+    const { recaptcha_token, ...formData } = req.body;
     const timestamp = new Date().toISOString();
-    
+
     console.log(`[${timestamp}] DM Tours Contact Form:`, JSON.stringify(formData, null, 2));
-    
+
+    // Verify reCAPTCHA token
+    if (!recaptcha_token) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'reCAPTCHA token is required'
+      });
+    }
+
+    if (!RECAPTCHA_SECRET_KEY) {
+      console.error('RECAPTCHA_SECRET_KEY is not configured');
+      return res.status(500).json({
+        status: 'error',
+        message: 'Server configuration error: reCAPTCHA secret key is not set'
+      });
+    }
+
+    try {
+      const verifyURL = `https://www.google.com/recaptcha/api/siteverify?secret=${RECAPTCHA_SECRET_KEY}&response=${recaptcha_token}`;
+      const response = await fetch(verifyURL);
+      const data = await response.json();
+
+      if (!data.success || (data.score !== undefined && data.score <= 0.5)) {
+        console.error('reCAPTCHA verification failed:', data);
+        return res.status(400).json({
+          status: 'error',
+          message: 'reCAPTCHA verification failed',
+          details: data['error-codes'] || 'Invalid token or low score'
+        });
+      }
+
+      console.log('✅ reCAPTCHA verification successful');
+    } catch (recaptchaError) {
+      console.error('Error verifying reCAPTCHA:', recaptchaError);
+      return res.status(500).json({
+        status: 'error',
+        message: 'Error verifying reCAPTCHA',
+        details: recaptchaError.message
+      });
+    }
+
     // Format and send WhatsApp message
     try {
       const recipientNumber = '94771461925'; // WhatsApp number without +
       const chatId = recipientNumber + '@c.us';
       const message = formatContactFormMessage(formData);
-      
+
       console.log(`Attempting to send WhatsApp message to: ${recipientNumber}`);
       console.log(`Chat ID: ${chatId}`);
       console.log(`Message content: ${message}`);
       console.log(`Client ready state: ${client.info ? 'Ready' : 'Not ready'}`);
-      
+
       await client.sendMessage(chatId, message);
       console.log(`✅ WhatsApp message sent successfully to ${recipientNumber}`);
-      
-      res.json({ 
-        status: 'success', 
+
+      res.json({
+        status: 'success',
         message: 'Contact form submitted and WhatsApp message sent successfully',
         timestamp: timestamp,
         sentTo: recipientNumber,
@@ -330,10 +379,10 @@ app.post('/dm-tors/contactform', async (req, res) => {
     } catch (whatsappError) {
       console.error('❌ Error sending WhatsApp message:', whatsappError);
       console.error('Error details:', whatsappError.message);
-      
+
       // Still return success for the API call, but note WhatsApp failure
-      res.json({ 
-        status: 'partial_success', 
+      res.json({
+        status: 'partial_success',
         message: 'Contact form submitted but WhatsApp message failed to send',
         timestamp: timestamp,
         whatsappError: whatsappError.message,
