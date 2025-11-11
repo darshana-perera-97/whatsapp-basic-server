@@ -51,7 +51,7 @@ const normalizedAllowedOrigins = allowedOrigins.map(normalizeOrigin);
 
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps, Postman, or curl requests)
+    // Always allow requests - permissive CORS for development and production
     if (!origin) {
       console.log('CORS: Request with no origin - allowing');
       return callback(null, true);
@@ -59,25 +59,21 @@ const corsOptions = {
     
     const normalizedOrigin = normalizeOrigin(origin);
     console.log(`CORS: Checking origin: ${origin} (normalized: ${normalizedOrigin})`);
-    console.log(`CORS: Allowed origins: ${allowedOrigins.join(', ')}`);
     
     // Check if origin matches any allowed origin (case-insensitive, ignoring trailing slash)
     const isAllowed = normalizedAllowedOrigins.some(allowed => {
       return allowed === normalizedOrigin;
     });
     
-    if (isAllowed || normalizedAllowedOrigins.includes('*')) {
-      console.log(`✅ CORS: Origin ${origin} is ALLOWED`);
-      callback(null, true);
+    if (isAllowed) {
+      console.log(`✅ CORS: Origin ${origin} is in allowed list`);
     } else {
-      console.warn(`⚠️  CORS: Origin ${origin} is NOT in allowed list`);
-      console.warn(`   Normalized: ${normalizedOrigin}`);
-      console.warn(`   Allowed normalized origins: ${normalizedAllowedOrigins.join(', ')}`);
-      // Allow the request anyway (for development/debugging)
-      // In production, you may want to restrict this
-      console.warn(`   ⚠️  Allowing request anyway (permissive mode)`);
-      callback(null, true);
+      console.log(`⚠️  CORS: Origin ${origin} not in list, but allowing anyway (permissive mode)`);
+      console.log(`   Allowed origins: ${allowedOrigins.join(', ')}`);
     }
+    
+    // Always allow the request
+    callback(null, true);
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'Access-Control-Request-Method', 'Access-Control-Request-Headers'],
@@ -92,17 +88,14 @@ app.use(cors(corsOptions));
 // Handle preflight requests explicitly
 app.options('*', cors(corsOptions));
 
-// Additional CORS headers middleware as backup
+// Additional CORS headers middleware as backup - always allow
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  const normalizedOrigin = origin ? origin.replace(/\/$/, '').toLowerCase() : '';
-  const isAllowed = !origin || normalizedAllowedOrigins.some(allowed => {
-    return allowed === normalizedOrigin || allowed === '*';
-  });
   
-  if (isAllowed && origin) {
+  // Always set the origin header to the requesting origin (or * if no origin)
+  if (origin) {
     res.header('Access-Control-Allow-Origin', origin);
-  } else if (!origin) {
+  } else {
     res.header('Access-Control-Allow-Origin', '*');
   }
   
