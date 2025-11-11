@@ -355,37 +355,71 @@ app.post('/dm-tors/contactform', async (req, res) => {
       });
     }
 
-    // Format and send WhatsApp message
-    try {
-      const recipientNumber = '94771461925'; // WhatsApp number without +
-      const chatId = recipientNumber + '@c.us';
-      const message = formatContactFormMessage(formData);
+    // Format and send WhatsApp message to multiple recipients
+    const recipientNumbers = ['94771461925', '94778808689']; // WhatsApp numbers without +
+    const message = formatContactFormMessage(formData);
+    const sendResults = [];
+    let allSuccess = true;
+    let anySuccess = false;
 
-      console.log(`Attempting to send WhatsApp message to: ${recipientNumber}`);
-      console.log(`Chat ID: ${chatId}`);
-      console.log(`Message content: ${message}`);
-      console.log(`Client ready state: ${client.info ? 'Ready' : 'Not ready'}`);
+    console.log(`Attempting to send WhatsApp message to ${recipientNumbers.length} recipients`);
+    console.log(`Message content: ${message}`);
+    console.log(`Client ready state: ${client.info ? 'Ready' : 'Not ready'}`);
 
-      await client.sendMessage(chatId, message);
-      console.log(`✅ WhatsApp message sent successfully to ${recipientNumber}`);
+    // Send message to each recipient
+    for (const recipientNumber of recipientNumbers) {
+      try {
+        const chatId = recipientNumber + '@c.us';
+        console.log(`Sending to: ${recipientNumber} (${chatId})`);
 
+        await client.sendMessage(chatId, message);
+        console.log(`✅ WhatsApp message sent successfully to ${recipientNumber}`);
+
+        sendResults.push({
+          number: recipientNumber,
+          status: 'success',
+          message: 'Message sent successfully'
+        });
+        anySuccess = true;
+      } catch (whatsappError) {
+        console.error(`❌ Error sending WhatsApp message to ${recipientNumber}:`, whatsappError);
+        console.error('Error details:', whatsappError.message);
+
+        sendResults.push({
+          number: recipientNumber,
+          status: 'failed',
+          message: whatsappError.message
+        });
+        allSuccess = false;
+      }
+    }
+
+    // Determine response status
+    if (allSuccess) {
       res.json({
         status: 'success',
-        message: 'Contact form submitted and WhatsApp message sent successfully',
+        message: 'Contact form submitted and WhatsApp messages sent successfully to all recipients',
         timestamp: timestamp,
-        sentTo: recipientNumber,
+        sentTo: recipientNumbers,
+        results: sendResults,
         data: formData
       });
-    } catch (whatsappError) {
-      console.error('❌ Error sending WhatsApp message:', whatsappError);
-      console.error('Error details:', whatsappError.message);
-
-      // Still return success for the API call, but note WhatsApp failure
+    } else if (anySuccess) {
       res.json({
         status: 'partial_success',
-        message: 'Contact form submitted but WhatsApp message failed to send',
+        message: 'Contact form submitted but some WhatsApp messages failed to send',
         timestamp: timestamp,
-        whatsappError: whatsappError.message,
+        sentTo: recipientNumbers,
+        results: sendResults,
+        data: formData
+      });
+    } else {
+      res.json({
+        status: 'partial_success',
+        message: 'Contact form submitted but all WhatsApp messages failed to send',
+        timestamp: timestamp,
+        sentTo: recipientNumbers,
+        results: sendResults,
         data: formData
       });
     }
