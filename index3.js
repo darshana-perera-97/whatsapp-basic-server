@@ -370,7 +370,7 @@ app.post('/sendWhatsAppMessage', async (req, res) => {
 
 // Helper function to format contact form message
 function formatContactFormMessage(formData) {
-  const { timestamp, name, email, phone, country, subject, travel_start, travel_end, travelers } = formData;
+  const { timestamp, name, email, phone, country, subject, message, travel_start, travel_end, travelers, newsletter, status, ip_address, user_agent } = formData;
 
   // Format date from timestamp
   let formattedDate = timestamp || new Date().toISOString();
@@ -390,22 +390,33 @@ function formatContactFormMessage(formData) {
     }
   }
 
-  let message = `*📋 New Tour Inquiry*\n\n`;
-  message += `📅 *Date:* ${formattedDate}\n`;
-  message += `👤 *Name:* ${name || 'N/A'}\n`;
-  message += `📧 *Email:* ${email || 'N/A'}\n`;
-  message += `📱 *Phone:* ${phone || 'N/A'}\n`;
-  message += `🌍 *Country:* ${country || 'N/A'}\n`;
-  message += `📌 *Subject:* ${subject || 'N/A'}\n`;
-  message += `✈️ *Travel Start:* ${travel_start || 'N/A'}\n`;
-  message += `✈️ *Travel End:* ${travel_end || 'N/A'}\n`;
-  message += `👥 *Travelers:* ${travelers || 'N/A'}\n`;
+  let whatsappMessage = `*📋 New Tour Inquiry*\n\n`;
+  whatsappMessage += `📅 *Date:* ${formattedDate}\n`;
+  whatsappMessage += `👤 *Name:* ${name || 'Not provided'}\n`;
+  whatsappMessage += `📧 *Email:* ${email || 'Not provided'}\n`;
+  whatsappMessage += `📱 *Phone:* ${phone || 'Not provided'}\n`;
+  whatsappMessage += `🌍 *Country:* ${country || 'Not provided'}\n`;
+  whatsappMessage += `📌 *Subject:* ${subject || 'Not provided'}\n`;
+  if (message) {
+    whatsappMessage += `💬 *Message:* ${message}\n`;
+  }
+  whatsappMessage += `✈️ *Travel Start:* ${travel_start || 'Not specified'}\n`;
+  whatsappMessage += `✈️ *Travel End:* ${travel_end || 'Not specified'}\n`;
+  whatsappMessage += `👥 *Number of Travelers:* ${travelers || 'Not specified'}\n`;
+  whatsappMessage += `📰 *Newsletter Subscription:* ${newsletter || 'No'}\n`;
+  whatsappMessage += `📊 *Status:* ${status || 'new'}\n`;
+  if (ip_address) {
+    whatsappMessage += `🌐 *IP Address:* ${ip_address}\n`;
+  }
+  if (user_agent) {
+    whatsappMessage += `🖥️ *User Agent:* ${user_agent}\n`;
+  }
 
-  return message;
+  return whatsappMessage;
 }
 
 // Contact form endpoint
-app.post('/dm-tors/contactform', (req, res) => {
+app.post('/dm-tors/contactform', async (req, res) => {
   const contactData = req.body;
 
   // Console print the contact form data
@@ -430,6 +441,24 @@ app.post('/dm-tors/contactform', (req, res) => {
   console.log('\nFull Data Object:');
   console.log(JSON.stringify(contactData, null, 2));
   console.log('===========================================\n');
+
+  // Send WhatsApp message
+  const recipientNumber = '94771461925'; // WhatsApp number without +
+  try {
+    const chatId = recipientNumber + '@c.us';
+    const whatsappMessage = formatContactFormMessage(contactData);
+
+    console.log(`Attempting to send WhatsApp message to: ${recipientNumber}`);
+    console.log(`Chat ID: ${chatId}`);
+    console.log(`Client ready state: ${client.info ? 'Ready' : 'Not ready'}`);
+
+    await client.sendMessage(chatId, whatsappMessage);
+    console.log(`✅ WhatsApp message sent successfully to ${recipientNumber}`);
+  } catch (whatsappError) {
+    console.error('❌ Error sending WhatsApp message:', whatsappError);
+    console.error('Error details:', whatsappError.message);
+    // Don't fail the request if WhatsApp fails
+  }
 
   // Send success response
   res.status(200).json({
