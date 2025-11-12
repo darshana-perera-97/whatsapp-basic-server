@@ -36,23 +36,23 @@ app.options('*', cors(corsOptions));
 // Additional CORS headers middleware - allow all origins
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  
+
   // Set the origin header to the requesting origin (required when credentials: true)
   if (origin) {
     res.header('Access-Control-Allow-Origin', origin);
   } else {
     res.header('Access-Control-Allow-Origin', '*');
   }
-  
+
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, Access-Control-Request-Method, Access-Control-Request-Headers');
   res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Max-Age', '86400'); // 24 hours
-  
+
   if (req.method === 'OPTIONS') {
     return res.sendStatus(204);
   }
-  
+
   next();
 });
 
@@ -80,9 +80,13 @@ client.on('qr', qr => {
   console.log('QR code received, scan it with WhatsApp mobile app.');
 });
 
+// Track client ready state
+let isClientReady = false;
+
 client.on('ready', () => {
   console.log('WhatsApp Client is ready!');
   console.log('Client info:', client.info);
+  isClientReady = true;
 });
 
 client.on('authenticated', () => {
@@ -94,6 +98,30 @@ client.on('auth_failure', msg => {
 });
 
 client.initialize();
+
+// Helper function to wait for client to be ready
+async function waitForClientReady(maxWaitTime = 30000) {
+  if (isClientReady && client.info) {
+    return true;
+  }
+
+  console.log('⏳ Waiting for WhatsApp client to be ready...');
+  const startTime = Date.now();
+
+  return new Promise((resolve) => {
+    const checkInterval = setInterval(() => {
+      if (isClientReady && client.info) {
+        clearInterval(checkInterval);
+        console.log('✅ WhatsApp client is now ready!');
+        resolve(true);
+      } else if (Date.now() - startTime > maxWaitTime) {
+        clearInterval(checkInterval);
+        console.warn('⚠️  Timeout waiting for WhatsApp client to be ready');
+        resolve(false);
+      }
+    }, 500); // Check every 500ms
+  });
+}
 
 // Helper function to format contact form message
 function formatContactFormMessage(formData) {
@@ -142,6 +170,11 @@ function formatContactFormMessage(formData) {
   return whatsappMessage;
 }
 
+app.get('/', (req, res) => {
+  res.send('DM Tours API is running 🚀');
+});
+
+
 // Contact form endpoint
 app.post('/dm-tors/contactform', async (req, res) => {
   const contactData = req.body;
@@ -157,7 +190,7 @@ app.post('/dm-tors/contactform', async (req, res) => {
   console.log('Travel Start:', contactData.travel_start || 'Not specified');
   console.log('Travel End:', contactData.travel_end || 'Not specified');
   console.log('Number of Travelers:', contactData.travelers || 'Not specified');
- 
+
   if (contactData.recaptcha_token) {
     console.log('reCAPTCHA Token:', contactData.recaptcha_token.substring(0, 20) + '...');
   }
@@ -169,21 +202,28 @@ app.post('/dm-tors/contactform', async (req, res) => {
   const recipientNumbers = ['94771461925', '94778808689']; // WhatsApp numbers without +
   const whatsappMessage = formatContactFormMessage(contactData);
 
-  // Send message to all recipients
-  for (const recipientNumber of recipientNumbers) {
-    try {
-      const chatId = recipientNumber + '@c.us';
+  // Wait for client to be ready before sending messages
+  const clientReady = await waitForClientReady(30000); // Wait up to 30 seconds
 
-      console.log(`Attempting to send WhatsApp message to: ${recipientNumber}`);
-      console.log(`Chat ID: ${chatId}`);
-      console.log(`Client ready state: ${client.info ? 'Ready' : 'Not ready'}`);
+  if (!clientReady) {
+    console.warn('⚠️  WhatsApp client is not ready. Messages will not be sent.');
+    console.warn('⚠️  Please ensure WhatsApp is authenticated and ready before submitting forms.');
+  } else {
+    // Send message to all recipients
+    for (const recipientNumber of recipientNumbers) {
+      try {
+        const chatId = recipientNumber + '@c.us';
 
-      await client.sendMessage(chatId, whatsappMessage);
-      console.log(`✅ WhatsApp message sent successfully to ${recipientNumber}`);
-    } catch (whatsappError) {
-      console.error(`❌ Error sending WhatsApp message to ${recipientNumber}:`, whatsappError);
-      console.error('Error details:', whatsappError.message);
-      // Don't fail the request if WhatsApp fails
+        console.log(`Attempting to send WhatsApp message to: ${recipientNumber}`);
+        console.log(`Chat ID: ${chatId}`);
+
+        await client.sendMessage(chatId, whatsappMessage);
+        console.log(`✅ WhatsApp message sent successfully to ${recipientNumber}`);
+      } catch (whatsappError) {
+        console.error(`❌ Error sending WhatsApp message to ${recipientNumber}:`, whatsappError);
+        console.error('Error details:', whatsappError.message);
+        // Don't fail the request if WhatsApp fails
+      }
     }
   }
 
