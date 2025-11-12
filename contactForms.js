@@ -6,7 +6,7 @@ const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 
 const app = express();
-const PORT = process.env.PORT || 3057;
+const PORT = 3057;
 
 // reCAPTCHA secret key from environment variables
 const RECAPTCHA_SECRET_KEY = process.env.RECAPTCHA_SECRET_KEY;
