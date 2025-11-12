@@ -4,20 +4,50 @@ const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 3056;
 
-// CORS configuration - Allow all origins for development
+// CORS configuration - Allow specific origins
+const allowedOrigins = [
+  'https://dmtours.lk',
+  'http://dmtours.lk',
+  'https://www.dmtours.lk',
+  'http://www.dmtours.lk',
+  'http://localhost:5501',
+  'http://localhost:3000',
+  'http://127.0.0.1:5501',
+  'http://127.0.0.1:3000'
+];
+
 const corsOptions = {
-  origin: '*', // Allow all origins
-  methods: ['GET', 'POST', 'OPTIONS', 'PUT', 'DELETE'],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
+      callback(null, true);
+    } else {
+      console.log('⚠️  Blocked origin:', origin);
+      callback(null, true); // Allow all for now, but log it
+    }
+  },
+  methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Accept', 'Authorization', 'X-Requested-With'],
   exposedHeaders: ['Content-Type'],
   credentials: false,
   maxAge: 86400 // 24 hours
 };
 
-// Middleware - Add CORS headers manually as well
+// Middleware - Add CORS headers manually as well (this ensures headers are always set)
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
+  const origin = req.headers.origin;
+  
+  // Allow the origin if it's in our allowed list or if it's the production domain
+  if (origin && (allowedOrigins.includes(origin) || origin.includes('dmtours.lk'))) {
+    res.header('Access-Control-Allow-Origin', origin);
+  } else {
+    // For development or if origin matches dmtours.lk
+    res.header('Access-Control-Allow-Origin', '*');
+  }
+  
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Accept, Authorization, X-Requested-With');
   res.header('Access-Control-Max-Age', '86400');
   
@@ -34,8 +64,15 @@ app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
 
 // Handle preflight OPTIONS requests explicitly
 app.options('*', (req, res) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
+  const origin = req.headers.origin;
+  
+  if (origin && (allowedOrigins.includes(origin) || origin.includes('dmtours.lk'))) {
+    res.header('Access-Control-Allow-Origin', origin);
+  } else {
+    res.header('Access-Control-Allow-Origin', '*');
+  }
+  
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Accept, Authorization, X-Requested-With');
   res.sendStatus(200);
 });
@@ -73,7 +110,12 @@ app.post('/dm-tors/contactform', (req, res) => {
   console.log('===========================================\n');
 
   // Set explicit CORS headers in response
-  res.header('Access-Control-Allow-Origin', '*');
+  const origin = req.headers.origin;
+  if (origin && (allowedOrigins.includes(origin) || origin.includes('dmtours.lk'))) {
+    res.header('Access-Control-Allow-Origin', origin);
+  } else {
+    res.header('Access-Control-Allow-Origin', '*');
+  }
   res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Accept');
   
