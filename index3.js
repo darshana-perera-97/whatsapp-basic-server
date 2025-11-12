@@ -150,17 +150,19 @@ client.on('auth_failure', msg => {
 
 client.initialize();
 
-// Root endpoint
-app.get('/', (req, res) => {
-  res.send('Hello! This is a basic Node.js server running successfully.');
-});
-
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.json({
-    status: 'OK',
-    message: 'Server is running',
-    timestamp: new Date().toISOString()
+  res.status(200).json({ status: 'OK', message: 'Server is running' });
+});
+
+// Root endpoint
+app.get('/', (req, res) => {
+  res.status(200).json({ 
+    message: 'DM Tours Backend API',
+    endpoints: {
+      contactForm: 'POST /dm-tors/contactform',
+      health: 'GET /health'
+    }
   });
 });
 
@@ -402,132 +404,46 @@ function formatContactFormMessage(formData) {
   return message;
 }
 
-// DM Tours contact form endpoint
-app.post('/dm-tors/contactform', async (req, res) => {
-  try {
-    const { recaptcha_token, ...formData } = req.body;
-    const timestamp = new Date().toISOString();
+// Contact form endpoint
+app.post('/dm-tors/contactform', (req, res) => {
+  const contactData = req.body;
 
-    console.log(`[${timestamp}] DM Tours Contact Form:`, JSON.stringify(formData, null, 2));
-
-    // Verify reCAPTCHA token
-    if (!recaptcha_token) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'reCAPTCHA token is required'
-      });
-    }
-
-    if (!RECAPTCHA_SECRET_KEY) {
-      console.error('RECAPTCHA_SECRET_KEY is not configured');
-      return res.status(500).json({
-        status: 'error',
-        message: 'Server configuration error: reCAPTCHA secret key is not set'
-      });
-    }
-
-    try {
-      const verifyURL = `https://www.google.com/recaptcha/api/siteverify?secret=${RECAPTCHA_SECRET_KEY}&response=${recaptcha_token}`;
-      const response = await fetch(verifyURL);
-      const data = await response.json();
-
-      if (!data.success || (data.score !== undefined && data.score <= 0.5)) {
-        console.error('reCAPTCHA verification failed:', data);
-        return res.status(400).json({
-          status: 'error',
-          message: 'reCAPTCHA verification failed',
-          details: data['error-codes'] || 'Invalid token or low score'
-        });
-      }
-
-      console.log('✅ reCAPTCHA verification successful');
-    } catch (recaptchaError) {
-      console.error('Error verifying reCAPTCHA:', recaptchaError);
-      return res.status(500).json({
-        status: 'error',
-        message: 'Error verifying reCAPTCHA',
-        details: recaptchaError.message
-      });
-    }
-
-    // Format and send WhatsApp message to multiple recipients
-    const recipientNumbers = ['94771461925', '94778808689']; // WhatsApp numbers without +
-    const message = formatContactFormMessage(formData);
-    const sendResults = [];
-    let allSuccess = true;
-    let anySuccess = false;
-
-    console.log(`Attempting to send WhatsApp message to ${recipientNumbers.length} recipients`);
-    console.log(`Message content: ${message}`);
-    console.log(`Client ready state: ${client.info ? 'Ready' : 'Not ready'}`);
-
-    // Send message to each recipient
-    for (const recipientNumber of recipientNumbers) {
-      try {
-        const chatId = recipientNumber + '@c.us';
-        console.log(`Sending to: ${recipientNumber} (${chatId})`);
-
-        await client.sendMessage(chatId, message);
-        console.log(`✅ WhatsApp message sent successfully to ${recipientNumber}`);
-
-        sendResults.push({
-          number: recipientNumber,
-          status: 'success',
-          message: 'Message sent successfully'
-        });
-        anySuccess = true;
-      } catch (whatsappError) {
-        console.error(`❌ Error sending WhatsApp message to ${recipientNumber}:`, whatsappError);
-        console.error('Error details:', whatsappError.message);
-
-        sendResults.push({
-          number: recipientNumber,
-          status: 'failed',
-          message: whatsappError.message
-        });
-        allSuccess = false;
-      }
-    }
-
-    // Determine response status
-    if (allSuccess) {
-      res.json({
-        status: 'success',
-        message: 'Contact form submitted and WhatsApp messages sent successfully to all recipients',
-        timestamp: timestamp,
-        sentTo: recipientNumbers,
-        results: sendResults,
-        data: formData
-      });
-    } else if (anySuccess) {
-      res.json({
-        status: 'partial_success',
-        message: 'Contact form submitted but some WhatsApp messages failed to send',
-        timestamp: timestamp,
-        sentTo: recipientNumbers,
-        results: sendResults,
-        data: formData
-      });
-    } else {
-      res.json({
-        status: 'partial_success',
-        message: 'Contact form submitted but all WhatsApp messages failed to send',
-        timestamp: timestamp,
-        sentTo: recipientNumbers,
-        results: sendResults,
-        data: formData
-      });
-    }
-  } catch (error) {
-    console.error('Error processing contact form:', error);
-    res.status(500).json({ status: 'error', message: error.message });
+  // Console print the contact form data
+  console.log('\n========== CONTACT FORM SUBMISSION ==========');
+  console.log('Timestamp:', contactData.timestamp || new Date().toISOString());
+  console.log('Name:', contactData.name || 'Not provided');
+  console.log('Email:', contactData.email || 'Not provided');
+  console.log('Phone:', contactData.phone || 'Not provided');
+  console.log('Country:', contactData.country || 'Not provided');
+  console.log('Subject:', contactData.subject || 'Not provided');
+  console.log('Message:', contactData.message || 'Not provided');
+  console.log('Travel Start:', contactData.travel_start || 'Not specified');
+  console.log('Travel End:', contactData.travel_end || 'Not specified');
+  console.log('Number of Travelers:', contactData.travelers || 'Not specified');
+  console.log('Newsletter Subscription:', contactData.newsletter || 'No');
+  console.log('Status:', contactData.status || 'new');
+  console.log('IP Address:', contactData.ip_address || 'Unknown');
+  console.log('User Agent:', contactData.user_agent || 'Unknown');
+  if (contactData.recaptcha_token) {
+    console.log('reCAPTCHA Token:', contactData.recaptcha_token.substring(0, 20) + '...');
   }
+  console.log('\nFull Data Object:');
+  console.log(JSON.stringify(contactData, null, 2));
+  console.log('===========================================\n');
+
+  // Send success response
+  res.status(200).json({
+    success: true,
+    message: 'Contact form submitted successfully',
+    data: contactData
+  });
 });
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-  console.log(`Visit http://localhost:${PORT} to see the API response`);
+  console.log(`\n🚀 DM Tours Backend Server is running on port ${PORT}`);
+  console.log(`📍 Contact form endpoint: http://localhost:${PORT}/dm-tors/contactform`);
+  console.log(`💚 Health check: http://localhost:${PORT}/health\n`);
 });
 
 module.exports = app;
