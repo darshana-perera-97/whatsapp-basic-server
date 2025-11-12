@@ -15,66 +15,11 @@ if (!RECAPTCHA_SECRET_KEY) {
   console.warn('⚠️  WARNING: RECAPTCHA_SECRET_KEY is not set in environment variables');
 }
 
-// CORS configuration
-// Default production origins
-const defaultProductionOrigins = ['https://dmtours.lk', 'https://www.dmtours.lk'];
-
-// Default development origins (always included)
-const defaultDevOrigins = [
-  'http://localhost:3000', 
-  'http://localhost:5173',
-  'http://127.0.0.1:5500',
-  'http://127.0.0.1:5501',
-  'http://localhost:5500',
-  'http://localhost:5501'
-];
-
-// Merge environment origins with defaults
-const envOrigins = process.env.CORS_ORIGIN 
-  ? process.env.CORS_ORIGIN.split(',').map(origin => origin.trim())
-  : defaultProductionOrigins;
-
-// Combine env origins with dev origins (remove duplicates)
-const allowedOrigins = [...new Set([...envOrigins, ...defaultDevOrigins])];
-
-console.log('🔧 CORS Configuration:');
-console.log(`   Allowed origins: ${allowedOrigins.join(', ')}`);
-console.log(`   CORS_ORIGIN env var: ${process.env.CORS_ORIGIN || 'Not set (using defaults)'}`);
-
-// Normalize origins (remove trailing slashes and convert to lowercase for comparison)
-const normalizeOrigin = (origin) => {
-  if (!origin) return '';
-  return origin.replace(/\/$/, '').toLowerCase();
-};
-
-const normalizedAllowedOrigins = allowedOrigins.map(normalizeOrigin);
+// CORS configuration - Allow all origins
+console.log('🔧 CORS Configuration: Allowing all origins');
 
 const corsOptions = {
-  origin: function (origin, callback) {
-    // Always allow requests - permissive CORS for development and production
-    if (!origin) {
-      console.log('CORS: Request with no origin - allowing');
-      return callback(null, true);
-    }
-    
-    const normalizedOrigin = normalizeOrigin(origin);
-    console.log(`CORS: Checking origin: ${origin} (normalized: ${normalizedOrigin})`);
-    
-    // Check if origin matches any allowed origin (case-insensitive, ignoring trailing slash)
-    const isAllowed = normalizedAllowedOrigins.some(allowed => {
-      return allowed === normalizedOrigin;
-    });
-    
-    if (isAllowed) {
-      console.log(`✅ CORS: Origin ${origin} is in allowed list`);
-    } else {
-      console.log(`⚠️  CORS: Origin ${origin} not in list, but allowing anyway (permissive mode)`);
-      console.log(`   Allowed origins: ${allowedOrigins.join(', ')}`);
-    }
-    
-    // Always allow the request
-    callback(null, true);
-  },
+  origin: true, // Allow all origins
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'Access-Control-Request-Method', 'Access-Control-Request-Headers'],
   exposedHeaders: ['Content-Length', 'Content-Type'],
@@ -88,11 +33,11 @@ app.use(cors(corsOptions));
 // Handle preflight requests explicitly
 app.options('*', cors(corsOptions));
 
-// Additional CORS headers middleware as backup - always allow
+// Additional CORS headers middleware - allow all origins
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   
-  // Always set the origin header to the requesting origin (or * if no origin)
+  // Set the origin header to the requesting origin (required when credentials: true)
   if (origin) {
     res.header('Access-Control-Allow-Origin', origin);
   } else {
@@ -421,7 +366,6 @@ app.post('/dm-tors/contactform', async (req, res) => {
 
   // Console print the contact form data
   console.log('\n========== CONTACT FORM SUBMISSION ==========');
-  console.log('Timestamp:', contactData.timestamp || new Date().toISOString());
   console.log('Name:', contactData.name || 'Not provided');
   console.log('Email:', contactData.email || 'Not provided');
   console.log('Phone:', contactData.phone || 'Not provided');
@@ -431,10 +375,7 @@ app.post('/dm-tors/contactform', async (req, res) => {
   console.log('Travel Start:', contactData.travel_start || 'Not specified');
   console.log('Travel End:', contactData.travel_end || 'Not specified');
   console.log('Number of Travelers:', contactData.travelers || 'Not specified');
-  console.log('Newsletter Subscription:', contactData.newsletter || 'No');
-  console.log('Status:', contactData.status || 'new');
-  console.log('IP Address:', contactData.ip_address || 'Unknown');
-  console.log('User Agent:', contactData.user_agent || 'Unknown');
+ 
   if (contactData.recaptcha_token) {
     console.log('reCAPTCHA Token:', contactData.recaptcha_token.substring(0, 20) + '...');
   }
@@ -443,21 +384,25 @@ app.post('/dm-tors/contactform', async (req, res) => {
   console.log('===========================================\n');
 
   // Send WhatsApp message
-  const recipientNumber = '94771461925'; // WhatsApp number without +
-  try {
-    const chatId = recipientNumber + '@c.us';
-    const whatsappMessage = formatContactFormMessage(contactData);
+  const recipientNumbers = ['94771461925', '94778808689']; // WhatsApp numbers without +
+  const whatsappMessage = formatContactFormMessage(contactData);
 
-    console.log(`Attempting to send WhatsApp message to: ${recipientNumber}`);
-    console.log(`Chat ID: ${chatId}`);
-    console.log(`Client ready state: ${client.info ? 'Ready' : 'Not ready'}`);
+  // Send message to all recipients
+  for (const recipientNumber of recipientNumbers) {
+    try {
+      const chatId = recipientNumber + '@c.us';
 
-    await client.sendMessage(chatId, whatsappMessage);
-    console.log(`✅ WhatsApp message sent successfully to ${recipientNumber}`);
-  } catch (whatsappError) {
-    console.error('❌ Error sending WhatsApp message:', whatsappError);
-    console.error('Error details:', whatsappError.message);
-    // Don't fail the request if WhatsApp fails
+      console.log(`Attempting to send WhatsApp message to: ${recipientNumber}`);
+      console.log(`Chat ID: ${chatId}`);
+      console.log(`Client ready state: ${client.info ? 'Ready' : 'Not ready'}`);
+
+      await client.sendMessage(chatId, whatsappMessage);
+      console.log(`✅ WhatsApp message sent successfully to ${recipientNumber}`);
+    } catch (whatsappError) {
+      console.error(`❌ Error sending WhatsApp message to ${recipientNumber}:`, whatsappError);
+      console.error('Error details:', whatsappError.message);
+      // Don't fail the request if WhatsApp fails
+    }
   }
 
   // Send success response
