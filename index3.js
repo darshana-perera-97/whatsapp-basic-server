@@ -384,7 +384,7 @@ app.post('/dm-tors/contactform', async (req, res) => {
   console.log('===========================================\n');
 
   // Send WhatsApp message
-  const recipientNumbers = ['94771461925', '94778808689']; // WhatsApp numbers without +
+  const recipientNumbers = ['94771461925']; // WhatsApp numbers without +
   const whatsappMessage = formatContactFormMessage(contactData);
 
   // Send message to all recipients
