@@ -18,38 +18,11 @@ if (!RECAPTCHA_SECRET_KEY) {
 // CORS configuration - Allow all origins
 console.log('🔧 CORS Configuration: Allowing all origins');
 
-// CORS middleware - must be before routes
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-
-  // Set the origin header to the requesting origin (required when credentials: true)
-  // If no origin, allow all (for same-origin requests)
-  if (origin) {
-    res.header('Access-Control-Allow-Origin', origin);
-  } else {
-    res.header('Access-Control-Allow-Origin', '*');
-  }
-
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, Access-Control-Request-Method, Access-Control-Request-Headers, X-Requested-With');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Expose-Headers', 'Content-Length, Content-Type');
-  res.header('Access-Control-Max-Age', '86400'); // 24 hours
-
-  // Handle preflight requests
-  if (req.method === 'OPTIONS') {
-    return res.status(204).end();
-  }
-
-  next();
-});
-
-// Also use cors middleware as backup
+// CORS options - allow all origins
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps, Postman, etc.)
-    if (!origin) return callback(null, true);
-    // Allow all origins
+    // Allow requests with no origin (like mobile apps, curl, Postman)
+    // or allow all origins
     callback(null, true);
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
@@ -60,7 +33,11 @@ const corsOptions = {
   optionsSuccessStatus: 204
 };
 
+// Apply CORS middleware - must be before express.json()
 app.use(cors(corsOptions));
+
+// Explicitly handle OPTIONS requests for all routes
+app.options('*', cors(corsOptions));
 
 app.use(express.json());
 
