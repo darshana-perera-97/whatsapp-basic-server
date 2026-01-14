@@ -19,11 +19,15 @@ if (!RECAPTCHA_SECRET_KEY) {
 console.log('🔧 CORS Configuration: Allowing all origins');
 
 const corsOptions = {
-  origin: true, // Allow all origins
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, Postman, or file://)
+    // Allow all origins including null
+    callback(null, true);
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'Access-Control-Request-Method', 'Access-Control-Request-Headers'],
   exposedHeaders: ['Content-Length', 'Content-Type'],
-  credentials: true,
+  credentials: false, // Set to false to allow wildcard origin
   preflightContinue: false,
   optionsSuccessStatus: 204
 };
@@ -33,26 +37,30 @@ app.use(cors(corsOptions));
 // Handle preflight requests explicitly
 app.options('*', cors(corsOptions));
 
-// Additional CORS headers middleware - allow all origins
+// Additional CORS headers middleware - allow all origins including null
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  
-  // Set the origin header to the requesting origin (required when credentials: true)
-  if (origin) {
-    res.header('Access-Control-Allow-Origin', origin);
-  } else {
+
+  // Handle null origin (file:// protocol) and allow all origins
+  // When credentials is true, we need to set the specific origin or handle null
+  if (origin === 'null' || !origin) {
+    // For null origin (file://) or no origin, allow it
     res.header('Access-Control-Allow-Origin', '*');
+    // Don't set credentials for null origin
+  } else {
+    // For specific origins, allow with credentials
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
   }
-  
+
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, Access-Control-Request-Method, Access-Control-Request-Headers');
-  res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Max-Age', '86400'); // 24 hours
-  
+
   if (req.method === 'OPTIONS') {
     return res.sendStatus(204);
   }
-  
+
   next();
 });
 
