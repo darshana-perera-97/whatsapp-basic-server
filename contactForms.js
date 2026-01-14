@@ -18,26 +18,51 @@ if (!RECAPTCHA_SECRET_KEY) {
 // CORS configuration - Allow all origins
 console.log('🔧 CORS Configuration: Allowing all origins');
 
-// CORS options - allow all origins
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps, curl, Postman)
-    // or allow all origins
+    // Allow requests with no origin (like mobile apps, Postman, or file://)
+    // Allow all origins including null
     callback(null, true);
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'Access-Control-Request-Method', 'Access-Control-Request-Headers'],
   exposedHeaders: ['Content-Length', 'Content-Type'],
-  credentials: true,
+  credentials: false, // Set to false to allow wildcard origin
   preflightContinue: false,
   optionsSuccessStatus: 204
 };
 
-// Apply CORS middleware - must be before express.json()
 app.use(cors(corsOptions));
 
-// Explicitly handle OPTIONS requests for all routes
+// Handle preflight requests explicitly
 app.options('*', cors(corsOptions));
+
+// Additional CORS headers middleware - allow all origins including null
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+
+  // Handle null origin (file:// protocol) and allow all origins
+  // When credentials is true, we need to set the specific origin or handle null
+  if (origin === 'null' || !origin) {
+    // For null origin (file://) or no origin, allow it
+    res.header('Access-Control-Allow-Origin', '*');
+    // Don't set credentials for null origin
+  } else {
+    // For specific origins, allow with credentials
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+  }
+
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, Access-Control-Request-Method, Access-Control-Request-Headers');
+  res.header('Access-Control-Max-Age', '86400'); // 24 hours
+
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+
+  next();
+});
 
 app.use(express.json());
 
@@ -228,7 +253,7 @@ app.post('/dm-tors/contactform', async (req, res) => {
   console.log('===========================================\n');
 
   // Send WhatsApp message
-  const recipientNumbers = ['94771461925', '94778808689']; // WhatsApp numbers without +
+  const recipientNumbers = ['94771461925']; // WhatsApp numbers without +
   const whatsappMessage = formatContactFormMessage(contactData);
 
   // Wait for client to be ready before sending messages
